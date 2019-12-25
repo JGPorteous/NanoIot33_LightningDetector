@@ -1,24 +1,21 @@
 #include "arduino_secrets.h"
+///////please enter your sensitive data in the Secret tab/arduino_secrets.h
+// Use arduino_secrets.h.example to create one for the first time.
 
-//Secrets must be first~!
 #include "WiFiNINA.h"
 #include "PubSubClient.h"
 #include "NTPClient.h"
 #include "WiFiUdp.h"
 
-///////please enter your sensitive data in the Secret tab/arduino_secrets.h
 //WIFI
 WiFiClient wifiClient;
-char ssid[] = SECRET_SSID;        // your network SSID (name)
-char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
-int status = WL_IDLE_STATUS;     // the Wifi radio's status
-
+char ssid[] = SECRET_SSID;        
+char pass[] = SECRET_PASS;    
+int status = WL_IDLE_STATUS;    
 
 //MQTT
 PubSubClient client(wifiClient);
 const char* mqtt_server = MQTT_SERVER;
-long lastMsg = 0;
-char msg[50];
 String deviceName = MQTT_DEVICE_NAME;
 
 //NTP
