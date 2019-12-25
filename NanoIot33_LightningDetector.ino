@@ -93,13 +93,47 @@ void setup() {
 
   //SimpleTimer
   timer.setInterval(30000, checkNetwork, true);  //Every 30 Seconds, check network connection
-  checkNetwork();
-  //timer.setInterval(30000, updateNTP, true);    //Every 5 Minutes, update RTC via NTP
-  updateNTP();
+  //checkNetwork();
+  timer.setInterval(30000, updateNTP, true);    //Every 5 Minutes, update RTC via NTP
+  //updateNTP();
+  timer.setInterval(60000, getTemperatureAndHumidity, true); //Every 60 Seconds, get Temperature and Humidity
 }
- 
+
 void loop() {
-   if(digitalRead(lightningInt) == HIGH){
+  checkLightning();
+  timer.run();
+  printCurrentNet();
+  client.loop();
+}
+
+void getTemperatureAndHumidity() {
+  byte temperature = 0;
+    byte humidity = 0;
+    byte pdata[40];
+    int err = SimpleDHTErrSuccess;
+    
+    if ((err = dht11.read(&temperature, &humidity, NULL)) != SimpleDHTErrSuccess) {
+      Serial.print("DHT11 read failed "); Serial.print(err); 
+    } else {
+      if ((int)temperature != lastTemp) {
+        lastTemp = (int)temperature;
+        String sTemp;
+        sTemp = toJson("Temperature", String(temperature), "TimeStamp", timeClient.getFormattedDate());
+        //Serial.println(sTemp);
+        client.publish((char*)(String("/" + deviceName + "/temperature").c_str()), (char*) sTemp.c_str()); 
+      }
+      if ((int)humidity != lastHumidity) {
+        lastHumidity = (int)humidity;
+        String sHumidity;
+        sHumidity = toJson("Humidity", String(humidity), "TimeStamp", timeClient.getFormattedDate());
+        //Serial.println(sHumidity);
+        client.publish((char*)(String("/" + deviceName + "/humidity").c_str()), (char*) sHumidity.c_str()); 
+      }
+    }
+}
+
+void checkLightning() {
+  if(digitalRead(lightningInt) == HIGH){
     intVal = lightning.readInterruptReg();
     if(intVal == NOISE_INT){
       Serial.print("N"); 
@@ -125,46 +159,7 @@ void loop() {
       client.publish((char*)(String("/" + deviceName + "/detector").c_str()), (char*) lightningEvent.c_str()); 
     }
   }
-
-  if ((firstRun) || (millis () - startTime >= interval))
-  {
-    if (firstRun) {
-      firstRun = false;
-      client.publish((char*)(String("/" + deviceName + "/deviceCmd").c_str()), (char*)String("Started").c_str()); 
-
-    }
-    printCurrentNet();
-
-    byte temperature = 0;
-    byte humidity = 0;
-    byte pdata[40];
-    int err = SimpleDHTErrSuccess;
-    
-    if ((err = dht11.read(&temperature, &humidity, NULL)) != SimpleDHTErrSuccess) {
-      Serial.print("DHT11 read failed "); Serial.print(err); 
-    } else {
-      if ((int)temperature != lastTemp) {
-        lastTemp = (int)temperature;
-        String sTemp;
-        sTemp = toJson("Temperature", String(temperature), "TimeStamp", timeClient.getFormattedDate());
-        //Serial.println(sTemp);
-        client.publish((char*)(String("/" + deviceName + "/temperature").c_str()), (char*) sTemp.c_str()); 
-      }
-      if ((int)humidity != lastHumidity) {
-        lastHumidity = (int)humidity;
-        String sHumidity;
-        sHumidity = toJson("Humidity", String(humidity), "TimeStamp", timeClient.getFormattedDate());
-        //Serial.println(sHumidity);
-        client.publish((char*)(String("/" + deviceName + "/humidity").c_str()), (char*) sHumidity.c_str()); 
-      }
-    }
-         
-    startTime = millis ();
-  }
-  
-  client.loop();
 }
-
 void reset() {
   //https://community.st.com/s/question/0D50X00009XkamfSAB/nvicsystemreset-in-interrupt
   asm(
@@ -250,13 +245,13 @@ void setupLightningDetector() {
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
+  checkNetwork();
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
   //payload[lenght];
   String message = String((char*)payload).substring(0,length);
   message.trim();
-  
   
   Serial.println();
 
