@@ -35,6 +35,7 @@ void connectWiFi() {
 
   digitalWrite(LED_BUILTIN, HIGH);
   client.setServer(mqtt_server, 1883);
+  Serial.println("Connecting MQTT to callback");
   client.setCallback(callback);
   
   }
@@ -146,6 +147,7 @@ void checkWiFiConnection() {
     digitalWrite(LED_BUILTIN, LOW);
     connectWiFi();
     timeClient.update();
+    client.setCallback(callback);
   } else {
     //Serial.println("WiFi Seems connected???");
   }

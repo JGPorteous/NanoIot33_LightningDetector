@@ -73,7 +73,6 @@ bool firstRun = true;
 #include <SimpleDHT.h>
 int pinDHT11 = 7;
 SimpleDHT11 dht11(pinDHT11);
- 
 
 void setup() {
   SPI.begin(); // For SPI
@@ -92,17 +91,21 @@ void setup() {
   timeClient.setTimeOffset(7200); //7200 = GMT+2
 
   //SimpleTimer
-  timer.setInterval(30000, checkNetwork, true);  //Every 30 Seconds, check network connection
-  //checkNetwork();
-  timer.setInterval(30000, updateNTP, true);    //Every 5 Minutes, update RTC via NTP
-  //updateNTP();
-  timer.setInterval(60000, getTemperatureAndHumidity, true); //Every 60 Seconds, get Temperature and Humidity
+  timer.setInterval(30000, checkNetwork, false);  //Every 30 Seconds, check network connection
+  checkNetwork();
+  timer.setInterval(30000, updateNTP, false);    //Every 5 Minutes, update RTC via NTP
+  updateNTP();
+  timer.setInterval(60000, getTemperatureAndHumidity, false); //Every 60 Seconds, get Temperature and Humidity
+  getTemperatureAndHumidity();
+  //MQTT
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
 }
 
 void loop() {
   checkLightning();
   timer.run();
-  printCurrentNet();
+  //printCurrentNet();
   client.loop();
 }
 
@@ -113,7 +116,7 @@ void getTemperatureAndHumidity() {
     int err = SimpleDHTErrSuccess;
     
     if ((err = dht11.read(&temperature, &humidity, NULL)) != SimpleDHTErrSuccess) {
-      Serial.print("DHT11 read failed "); Serial.print(err); 
+      //Serial.print("DHT11 read failed "); Serial.print(err); 
     } else {
       if ((int)temperature != lastTemp) {
         lastTemp = (int)temperature;
@@ -172,7 +175,7 @@ void reset() {
 
 void updateNTP() {
    timeClient.update();
-   client.publish((char*)(String("/" + deviceName + "/deviceCmd").c_str()), (char*)String("Set Time").c_str()); 
+   client.publish((char*)(String("/" + deviceName + "/deviceStatus").c_str()), (char*)String("Set Time").c_str()); 
 }
 
 void setupLightningDetector() {
@@ -245,7 +248,7 @@ void setupLightningDetector() {
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
-  checkNetwork();
+  //checkNetwork();
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
@@ -253,17 +256,17 @@ void callback(char* topic, byte* payload, unsigned int length) {
   String message = String((char*)payload).substring(0,length);
   message.trim();
   
-  Serial.println();
+  //Serial.println();
 
   if (String(topic) == "/" + deviceName + "/deviceCmd") {
-    Serial.println("");
-    Serial.println("");
-    Serial.print("message: "); Serial.print(message); Serial.print("  Length: "); Serial.println(message.length());
-    Serial.println("/deviceCmd");
+//    Serial.println("");
+//    Serial.println("");
+//    Serial.print("message: "); Serial.print(message); Serial.print("  Length: "); Serial.println(message.length());
+//    Serial.println("/deviceCmd");
 
     if (message == "reboot") {
       Serial.println("Rebooting!!!!!");
-      client.publish((char*)(String("/" + deviceName + "/deviceCmd").c_str()), (char*)String("Rebooting").c_str()); 
+      client.publish((char*)(String("/" + deviceName + "/deviceStatus").c_str()), (char*)String("Rebooting").c_str()); 
       
       Serial.end();
       delay(100);
@@ -271,16 +274,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
     if (message == "time") {
       Serial.println("Sending time...");
-      client.publish((char*)(String("/" + deviceName + "/deviceCmd").c_str()), (char*)timeClient.getFormattedDate().c_str()); 
+      client.publish((char*)(String("/" + deviceName + "/deviceStatus").c_str()), (char*)timeClient.getFormattedDate().c_str()); 
     }
     if (message == "settime") {
       Serial.println("Setting time...");
       timeClient.update();
       delay(500);
-      client.publish((char*)(String("/" + deviceName + "/deviceCmd").c_str()), (char*)timeClient.getFormattedDate().c_str()); 
+      client.publish((char*)(String("/" + deviceName + "/deviceStatus").c_str()), (char*)timeClient.getFormattedDate().c_str()); 
     }
-    Serial.println("");
-    Serial.println("");
+    //Serial.println("");
+    //Serial.println("");
    }
 
 }
