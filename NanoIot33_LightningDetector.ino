@@ -2,10 +2,14 @@
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
 // Use arduino_secrets.h.example to create one for the first time.
 
+#include "SimpleTimer.h"
 #include "WiFiNINA.h"
 #include "PubSubClient.h"
 #include "NTPClient.h"
 #include "WiFiUdp.h"
+
+//SimpleTimer
+SimpleTimer timer;
 
 //WIFI
 WiFiClient wifiClient;
@@ -21,9 +25,6 @@ String deviceName = MQTT_DEVICE_NAME;
 //NTP
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
-unsigned long startTimeNTP = millis ();
-unsigned long intervalNTP = 300000;
-bool firstRunNTP = true;
 
 //Temperature and Humidity
 int lastTemp = 0;
@@ -82,96 +83,23 @@ void setup() {
   digitalWrite(LED_BUILTIN, HIGH);
   delay(1000);
   digitalWrite(LED_BUILTIN, LOW);
-  
-  
-  if( !lightning.beginSPI(spiCS, 2000000) ) { 
-    Serial.println ("Lightning Detector did not start up, freezing!"); 
-    while(1); 
-  }
-  else
-    Serial.println("Lightning Detector Ready!\n");
 
-  lightning.maskDisturber(maskDisturbers); 
-  
-  int maskVal = lightning.readMaskDisturber();
-  Serial.print("Are disturbers being masked: "); 
-  if (maskVal == 1)
-    Serial.println("YES"); 
-  else if (maskVal == 0)
-    Serial.println("NO"); 
-
-  lightning.setIndoorOutdoor(location); 
-
-  int enviVal = lightning.readIndoorOutdoor();
-  Serial.print("Are we set for indoor or outdoor: ");  
-  if( enviVal == INDOOR )
-    Serial.println("Indoor.");  
-  else if( enviVal == OUTDOOR )
-    Serial.println("Outdoor.");  
-  else 
-    Serial.println(enviVal, BIN); 
-
-  lightning.setNoiseLevel(noiseFloor);  
-
-  int noiseVal = lightning.readNoiseLevel();
-  Serial.print("Noise Level is set at: ");
-  Serial.println(noiseVal);
-
-  lightning.watchdogThreshold(watchDogVal); 
-
-  int watchVal = lightning.readWatchdogThreshold();
-  Serial.print("Watchdog Threshold is set to: ");
-  Serial.println(watchVal);
-
-  lightning.spikeRejection(spike); 
-
-  int spikeVal = lightning.readSpikeRejection();
-  Serial.print("Spike Rejection is set to: ");
-  Serial.println(spikeVal);
-
-  lightning.lightningThreshold(lightningThresh); 
-
-  uint8_t lightVal = lightning.readLightningThreshold();
-  Serial.print("The number of strikes before interrupt is triggerd: "); 
-  Serial.println(lightVal); 
-
-  lightning.tuneCap(tuneCap); 
-
-  // When reading the internal capcitor value, it will return the value in pF.
-  int tuneVal = lightning.readTuneCap();
-  Serial.print("Internal Capacitor is set to: "); 
-  Serial.println(tuneVal);
-
-  lightning.changeDivRatio(divRatio);
-
-  // Read the division ratio - 16 is default.  
-  byte divVal = lightning.readDivRatio(); 
-  Serial.print("Division Ratio is set to: "); 
-  Serial.println(divVal); 
-  
-  lightning.clearStatistics(true);
-  
+  //Lightning
+  setupLightningDetector();
+    
+  //NTP
   timeClient.begin();
-  timeClient.setTimeOffset(7200);
+  timeClient.setTimeOffset(7200); //7200 = GMT+2
+
+  //SimpleTimer
+  timer.setInterval(30000, checkNetwork, true);  //Every 30 Seconds, check network connection
+  checkNetwork();
+  //timer.setInterval(30000, updateNTP, true);    //Every 5 Minutes, update RTC via NTP
+  updateNTP();
 }
  
 void loop() {
-  reconnect();
-  digitalWrite(LED_BUILTIN, HIGH);
-
-  if ((firstRunNTP) || (millis () - startTimeNTP >= intervalNTP))
-  {
-    if (firstRunNTP)
-      firstRunNTP = false;
-
-    timeClient.update();
-    
-    client.publish((char*)(String("/" + deviceName + "/deviceCmd").c_str()), (char*)String("Set Time").c_str()); 
-
-    startTimeNTP = millis ();
-  }
-  
-  if(digitalRead(lightningInt) == HIGH){
+   if(digitalRead(lightningInt) == HIGH){
     intVal = lightning.readInterruptReg();
     if(intVal == NOISE_INT){
       Serial.print("N"); 
@@ -247,6 +175,80 @@ void reset() {
     );
 }
 
+void updateNTP() {
+   timeClient.update();
+   client.publish((char*)(String("/" + deviceName + "/deviceCmd").c_str()), (char*)String("Set Time").c_str()); 
+}
+
+void setupLightningDetector() {
+  if( !lightning.beginSPI(spiCS, 2000000) ) { 
+    Serial.println ("Lightning Detector did not start up, freezing!"); 
+    while(1); 
+  }
+  else
+    Serial.println("Lightning Detector Ready!\n");
+
+  lightning.maskDisturber(maskDisturbers); 
+  
+  int maskVal = lightning.readMaskDisturber();
+  Serial.print("Are disturbers being masked: "); 
+  if (maskVal == 1)
+    Serial.println("YES"); 
+  else if (maskVal == 0)
+    Serial.println("NO"); 
+
+  lightning.setIndoorOutdoor(location); 
+
+  int enviVal = lightning.readIndoorOutdoor();
+  Serial.print("Are we set for indoor or outdoor: ");  
+  if( enviVal == INDOOR )
+    Serial.println("Indoor.");  
+  else if( enviVal == OUTDOOR )
+    Serial.println("Outdoor.");  
+  else 
+    Serial.println(enviVal, BIN); 
+
+  lightning.setNoiseLevel(noiseFloor);  
+
+  int noiseVal = lightning.readNoiseLevel();
+  Serial.print("Noise Level is set at: ");
+  Serial.println(noiseVal);
+
+  lightning.watchdogThreshold(watchDogVal); 
+
+  int watchVal = lightning.readWatchdogThreshold();
+  Serial.print("Watchdog Threshold is set to: ");
+  Serial.println(watchVal);
+
+  lightning.spikeRejection(spike); 
+
+  int spikeVal = lightning.readSpikeRejection();
+  Serial.print("Spike Rejection is set to: ");
+  Serial.println(spikeVal);
+
+  lightning.lightningThreshold(lightningThresh); 
+
+  uint8_t lightVal = lightning.readLightningThreshold();
+  Serial.print("The number of strikes before interrupt is triggerd: "); 
+  Serial.println(lightVal); 
+
+  lightning.tuneCap(tuneCap); 
+
+  // When reading the internal capcitor value, it will return the value in pF.
+  int tuneVal = lightning.readTuneCap();
+  Serial.print("Internal Capacitor is set to: "); 
+  Serial.println(tuneVal);
+
+  lightning.changeDivRatio(divRatio);
+
+  // Read the division ratio - 16 is default.  
+  byte divVal = lightning.readDivRatio(); 
+  Serial.print("Division Ratio is set to: "); 
+  Serial.println(divVal); 
+  
+  lightning.clearStatistics(true);
+}
+
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
@@ -287,7 +289,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
    }
 
 }
-void reconnect() {
+void checkNetwork() {
   checkWiFiConnection();
      
   while (!client.connected()) {
