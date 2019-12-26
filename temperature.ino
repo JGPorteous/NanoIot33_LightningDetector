@@ -1,4 +1,6 @@
 
+
+
 // which analog pin to connect
 #define THERMISTORPIN A7       
 // resistance at 25 degrees C
@@ -18,8 +20,6 @@ int samples[NUMSAMPLES];
 float maxTemp = 0;
 float minTemp = 0;
 
-
-
 void setMinTemp(float temp) {
   if (minTemp == 0)
     minTemp = temp;
@@ -35,7 +35,6 @@ void setMaxTemp(float temp) {
   if (maxTemp < temp)
     maxTemp = temp;
 }
-
 
 float getTemp() {
   uint8_t i;
@@ -78,4 +77,33 @@ float getTemp() {
   setMinTemp(steinhart);
   setMaxTemp(steinhart);
   return steinhart;
+}
+
+void getTemperatureAndHumidity() {
+  Serial.println("getTemperatureAndHumidity()");
+  byte temperature = 0;
+    byte humidity = 0;
+    byte pdata[40];
+    int err = SimpleDHTErrSuccess;
+    
+    if ((err = dht11.read(&temperature, &humidity, NULL)) != SimpleDHTErrSuccess) {
+      Serial.print("DHT11 read failed "); Serial.println(err); 
+    } else {
+      if ((int)temperature != lastTemp) {
+        lastTemp = (int)temperature;
+        lastTemp = 0; //disable last value tracking
+        String sTemp;
+        sTemp = toJson("Temperature", String(temperature), "TimeStamp", timeClient.getFormattedDate());
+        //Serial.println(sTemp);
+        client.publish((char*)(String("/" + deviceName + "/temperature").c_str()), (char*) sTemp.c_str()); 
+      }
+      if ((int)humidity != lastHumidity) {
+        lastHumidity = (int)humidity;
+        lastHumidity = 0; //disable last value tracking;
+        String sHumidity;
+        sHumidity = toJson("Humidity", String(humidity), "TimeStamp", timeClient.getFormattedDate());
+        //Serial.println(sHumidity);
+        client.publish((char*)(String("/" + deviceName + "/humidity").c_str()), (char*) sHumidity.c_str()); 
+      }
+    }
 }

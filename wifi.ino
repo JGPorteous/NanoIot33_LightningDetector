@@ -1,6 +1,9 @@
+
+void wifi_setup() {
+  connectWiFi();
+}
+
 //Wifi Routines
-
-
 void connectWiFi() {
   // check for the WiFi module:
   digitalWrite(LED_BUILTIN, LOW);
@@ -14,37 +17,33 @@ void connectWiFi() {
   if (fv < WIFI_FIRMWARE_LATEST_VERSION) {
     Serial.println("Please upgrade the firmware");
   }
-  
- 
-  WiFi.setHostname("HOSTNAME");
+   
+  WiFi.setHostname(HOSTNAME);
  
   // attempt to connect to Wifi network:
   while (status != WL_CONNECTED) {
-    digitalWrite(LED_BUILTIN, LOW);
+    digitalWrite(LED_BUILTIN, HIGH);
     Serial.print("Attempting to connect to WPA SSID: ");
     Serial.println(ssid);
     // Connect to WPA/WPA2 network:
     status = WiFi.begin(SECRET_SSID, SECRET_PASS);
    // WiFi.setHostname(HOSTNAME);
 
-    // wait 10 seconds for connection:
+    // wait 3 seconds for connection:
     delay(3000);
 
-//Serial.print("Hostname: ");
-//  Serial.println(WiFi.hostname());
-
-  digitalWrite(LED_BUILTIN, HIGH);
   client.setServer(mqtt_server, 1883);
   Serial.println("Connecting MQTT to callback");
   client.setCallback(callback);
-  
+  digitalWrite(LED_BUILTIN, HIGH);
   }
 
   // you're connected now, so print out the data:
   //Serial.print("You're connected to the network");
+  digitalWrite(LED_BUILTIN, HIGH);
   printCurrentNet();
   printWifiData();
-  digitalWrite(LED_BUILTIN, HIGH);
+  
 }
 
 
@@ -137,9 +136,6 @@ void printMacAddress(byte mac[]) {
   Serial.println();
 }
 
-
-
-
 void checkWiFiConnection() {
    status = WiFi.status();
   if (status != WL_CONNECTED) {
@@ -150,5 +146,37 @@ void checkWiFiConnection() {
     client.setCallback(callback);
   } else {
     //Serial.println("WiFi Seems connected???");
+  }
+}
+
+void checkNetwork() {
+  Serial.println("checkNetwork()");
+  checkWiFiConnection();
+     //Serial.print("LED_BUILTIN : "); Serial.println(LED_BUILTIN);
+  while (!client.connected()) {
+    Serial.println("OOPS! MQTT Disconnected!");
+    digitalWrite(LED_BUILTIN, LOW);
+    Serial.print("Attempting MQTT connection...");
+
+    if (status != WL_CONNECTED) {
+      connectWiFi();
+      digitalWrite(LED_BUILTIN, HIGH);
+      Serial.println(timeClient.getFormattedDate());
+    }
+  
+    // Create a random client ID
+    String clientId = "ESP8266Client-";
+    clientId += String(random(0xffff), HEX);
+    // Attempt to connect
+    if (client.connect(clientId.c_str())) {
+      Serial.println("connected");
+      client.subscribe((char*)String("/" + deviceName + "/deviceCmd").c_str());
+      digitalWrite(LED_BUILTIN, HIGH);
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      delay(5000);
+    }
   }
 }
